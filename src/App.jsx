@@ -17,6 +17,7 @@ import VisitLogs from './pages/VisitLogs';
 // Import Layout Components
 import Navbar from './components/common/Navbar';
 import Sidebar from './components/common/Sidebar';
+import Chatbot from './components/common/Chatbot';
 
 // Route Guard to verify role-based permissions
 const RouteGuard = ({ children, allowedRoles }) => {
@@ -85,6 +86,7 @@ function AppLayout() {
             <Route path="/track" element={<TrackComplaint />} />
           </Routes>
         </Container>
+        <Chatbot />
       </Box>
     );
   }
@@ -188,6 +190,7 @@ function AppLayout() {
           />
         </Routes>
       </Box>
+      <Chatbot />
     </Box>
   );
 }

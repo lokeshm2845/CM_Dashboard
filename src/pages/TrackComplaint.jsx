@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { 
-  Box, Container, Typography, Tab, Tabs, Paper, TextField, Button, Grid, FormControl, InputLabel, Select, MenuItem, Card, CardContent, Divider, Rating, Alert, Stack 
+  Box, Container, Typography, Tab, Tabs, Paper, TextField, Button, Grid, FormControl, InputLabel, Select, MenuItem, Card, CardContent, Divider, Rating, Alert, Stack, Checkbox, FormControlLabel
 } from '@mui/material';
 import { 
   Send as SendIcon, 
@@ -14,19 +14,7 @@ import { useNotification } from '../context/NotificationContext';
 import StatusBadge from '../components/common/StatusBadge';
 import SocialShare from '../components/common/SocialShare';
 
-const DISTRICTS = [
-  'New Delhi', 'North Delhi', 'South Delhi', 'East Delhi', 'West Delhi', 
-  'North East Delhi', 'North West Delhi', 'South East Delhi', 'South West Delhi', 
-  'Shahdara', 'Central Delhi'
-];
-
-const CATEGORIES = [
-  'Roads / Potholes',
-  'Water Leakage / Shortage',
-  'Garbage / Waste Pile',
-  'Streetlight / Power Outage',
-  'Public Nuisance / Safety'
-];
+import { DISTRICTS, COMPLAINT_CATEGORIES as CATEGORIES } from '../utils/constants';
 
 export default function TrackComplaint() {
   const { user } = useAuth();
@@ -42,6 +30,7 @@ export default function TrackComplaint() {
   const [lat, setLat] = useState('28.6139');
   const [lng, setLng] = useState('77.2090');
   const [submittedId, setSubmittedId] = useState(null);
+  const [isCritical, setIsCritical] = useState(false);
 
   // Tracking State
   const [trackNo, setTrackNo] = useState('');
@@ -68,7 +57,8 @@ export default function TrackComplaint() {
         district,
         photo_before: photoBefore,
         latitude: parseFloat(lat),
-        longitude: parseFloat(lng)
+        longitude: parseFloat(lng),
+        is_critical: isCritical
       };
 
       const result = await complaintService.createComplaint(payload, user);
@@ -82,6 +72,7 @@ export default function TrackComplaint() {
       setCategory('');
       setDistrict('');
       setPhotoBefore('');
+      setIsCritical(false);
     } catch (err) {
       showNotification('Error creating complaint. Please verify your fields.', 'error');
     }
@@ -287,6 +278,28 @@ export default function TrackComplaint() {
                         onChange={(e) => setPhotoBefore(e.target.value)}
                         placeholder="Enter image URL showing the damaged pothole/leak..."
                       />
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={isCritical}
+                            onChange={(e) => setIsCritical(e.target.checked)}
+                            color="error"
+                          />
+                        }
+                        label={
+                          <Typography variant="body2" sx={{ fontWeight: 700, color: '#B91C1C' }}>
+                            Is this life-threatening / critical? (Immediate CM Office Dispatch)
+                          </Typography>
+                        }
+                      />
+                      {isCritical && (
+                        <Alert severity="error" sx={{ mt: 1, fontWeight: 600 }}>
+                          WARNING: Declaring a false life-threatening alert is a punishable offense under the Delhi Civic-Tech Grievance Redressal Act.
+                        </Alert>
+                      )}
                     </Grid>
 
                     <Grid item xs={12}>

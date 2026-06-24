@@ -1,5 +1,5 @@
 -- ====================================================================
--- DELHI CM GRIEVANCE REDRESSAL DASHBOARD - SUPABASE SETUP SCRIPT
+-- DELHI CM GRIEVANCE REDRESSAL DASHBOARD - SUPABASE MASTER SETUP SCRIPT
 -- ====================================================================
 -- Copy and paste this entire script into your Supabase SQL Editor and run it.
 -- This will initialize all tables, triggers, policies, and seed users & data.
@@ -22,6 +22,7 @@ DROP TABLE IF EXISTS public.feedback CASCADE;
 DROP TABLE IF EXISTS public.visit_logs CASCADE;
 DROP TABLE IF EXISTS public.complaint_timeline CASCADE;
 DROP TABLE IF EXISTS public.complaints CASCADE;
+DROP TABLE IF EXISTS public.category_department_mapping CASCADE;
 DROP TABLE IF EXISTS public.officers CASCADE;
 DROP TABLE IF EXISTS public.users CASCADE;
 DROP TABLE IF EXISTS public.departments CASCADE;
@@ -32,7 +33,7 @@ DROP TABLE IF EXISTS public.departments CASCADE;
 
 -- A. Departments Table
 CREATE TABLE public.departments (
-    id UUID PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL UNIQUE,
     code VARCHAR(50) NOT NULL UNIQUE,
     active_officers_count INT DEFAULT 0,
@@ -64,14 +65,23 @@ CREATE TABLE public.officers (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- D. Complaints Table
+-- D. Category Department Mapping Table
+CREATE TABLE public.category_department_mapping (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    category VARCHAR(100) NOT NULL UNIQUE,
+    department_id UUID NOT NULL REFERENCES public.departments(id) ON DELETE CASCADE,
+    priority INT DEFAULT 1,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- E. Complaints Table
 CREATE TABLE public.complaints (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tracking_no VARCHAR(100) UNIQUE NOT NULL,
     title VARCHAR(255) NOT NULL,
     description TEXT NOT NULL,
     category VARCHAR(100) NOT NULL,
-    department_id UUID NOT NULL REFERENCES public.departments(id),
+    department_id UUID REFERENCES public.departments(id), -- Nullable initially for auto-routing
     status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'assigned', 'in_progress', 'resolved', 'reopened', 'escalated')),
     severity VARCHAR(50) DEFAULT 'medium' CHECK (severity IN ('low', 'medium', 'high', 'critical')),
     district VARCHAR(100) NOT NULL,
@@ -80,14 +90,19 @@ CREATE TABLE public.complaints (
     photo_before TEXT,
     photo_after TEXT,
     citizen_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    citizen_name VARCHAR(255),
+    citizen_phone VARCHAR(50),
+    citizen_email VARCHAR(255),
     assigned_officer_id UUID REFERENCES public.officers(id) ON DELETE SET NULL,
     resolution_notes TEXT,
+    is_critical BOOLEAN DEFAULT false,
+    source VARCHAR(50) DEFAULT 'web',
     resolved_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- E. Complaint Timeline Table
+-- F. Complaint Timeline Table
 CREATE TABLE public.complaint_timeline (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     complaint_id UUID NOT NULL REFERENCES public.complaints(id) ON DELETE CASCADE,
@@ -98,7 +113,7 @@ CREATE TABLE public.complaint_timeline (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- F. CM Visit Logs Table
+-- G. CM Visit Logs Table
 CREATE TABLE public.visit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     district VARCHAR(100) NOT NULL,
@@ -109,7 +124,7 @@ CREATE TABLE public.visit_logs (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- G. Feedback Table
+-- H. Feedback Table
 CREATE TABLE public.feedback (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     complaint_id UUID NOT NULL REFERENCES public.complaints(id) ON DELETE CASCADE,
@@ -118,7 +133,7 @@ CREATE TABLE public.feedback (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- H. Re-Inspections Table
+-- I. Re-Inspections Table
 CREATE TABLE public.re_inspections (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     complaint_id UUID NOT NULL REFERENCES public.complaints(id) ON DELETE CASCADE,
@@ -138,22 +153,47 @@ CREATE OR REPLACE FUNCTION public.route_complaint_assignment()
 RETURNS TRIGGER AS $$
 DECLARE
     target_officer_id UUID;
+    resolved_dept_id UUID;
 BEGIN
-    -- Find officer with minimum workload count in the designated department
-    SELECT id INTO target_officer_id
-    FROM public.officers
-    WHERE department_id = NEW.department_id AND is_active = true
-    ORDER BY workload_count ASC, created_at ASC
-    LIMIT 1;
+    -- Resolve department from mapping table if null
+    IF NEW.department_id IS NULL THEN
+        SELECT department_id INTO resolved_dept_id
+        FROM public.category_department_mapping
+        WHERE category = NEW.category
+        ORDER BY priority ASC, created_at ASC
+        LIMIT 1;
 
-    IF target_officer_id IS NOT NULL THEN
-        NEW.assigned_officer_id := target_officer_id;
+        NEW.department_id := resolved_dept_id;
+    END IF;
+
+    -- If a department_id is resolved/provided, find an active officer with the lowest workload
+    IF NEW.department_id IS NOT NULL AND NEW.assigned_officer_id IS NULL THEN
+        SELECT id INTO target_officer_id
+        FROM public.officers
+        WHERE department_id = NEW.department_id AND is_active = true
+        ORDER BY workload_count ASC, created_at ASC
+        LIMIT 1;
+
+        IF target_officer_id IS NOT NULL THEN
+            NEW.assigned_officer_id := target_officer_id;
+            NEW.status := 'assigned';
+            
+            -- Increment officer workload
+            UPDATE public.officers 
+            SET workload_count = workload_count + 1 
+            WHERE id = target_officer_id;
+        ELSE
+            -- No active officer, keep as pending
+            NEW.status := 'pending';
+        END IF;
+    ELSIF NEW.assigned_officer_id IS NOT NULL THEN
+        -- If officer is manually specified, set status to assigned
         NEW.status := 'assigned';
         
         -- Increment officer workload
         UPDATE public.officers 
         SET workload_count = workload_count + 1 
-        WHERE id = target_officer_id;
+        WHERE id = NEW.assigned_officer_id;
     END IF;
 
     RETURN NEW;
@@ -163,7 +203,7 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trigger_route_complaint_assignment
 BEFORE INSERT ON public.complaints
 FOR EACH ROW
-WHEN (NEW.assigned_officer_id IS NULL)
+WHEN (NEW.assigned_officer_id IS NULL OR NEW.department_id IS NULL)
 EXECUTE FUNCTION public.route_complaint_assignment();
 
 
@@ -200,10 +240,29 @@ EXECUTE FUNCTION public.log_complaint_timeline_event();
 CREATE OR REPLACE FUNCTION public.adjust_officer_workload()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF OLD.status IN ('assigned', 'in_progress') AND NEW.status = 'resolved' THEN
-        UPDATE public.officers
-        SET workload_count = GREATEST(0, workload_count - 1)
-        WHERE id = NEW.assigned_officer_id;
+    -- Handle officer workload adjustments on reassignment
+    IF OLD.assigned_officer_id IS DISTINCT FROM NEW.assigned_officer_id THEN
+        -- Decrement workload for old officer if they were active
+        IF OLD.assigned_officer_id IS NOT NULL AND OLD.status IN ('assigned', 'in_progress', 'reopened') THEN
+            UPDATE public.officers
+            SET workload_count = GREATEST(0, workload_count - 1)
+            WHERE id = OLD.assigned_officer_id;
+        END IF;
+        -- Increment workload for new officer if they are active
+        IF NEW.assigned_officer_id IS NOT NULL AND NEW.status IN ('assigned', 'in_progress', 'reopened') THEN
+            UPDATE public.officers
+            SET workload_count = workload_count + 1
+            WHERE id = NEW.assigned_officer_id;
+        END IF;
+    END IF;
+
+    -- Handle resolution status
+    IF OLD.status IN ('assigned', 'in_progress', 'reopened') AND NEW.status = 'resolved' THEN
+        IF NEW.assigned_officer_id IS NOT NULL THEN
+            UPDATE public.officers
+            SET workload_count = GREATEST(0, workload_count - 1)
+            WHERE id = NEW.assigned_officer_id;
+        END IF;
         
         -- Trigger random 10% re-inspection selection
         IF random() < 0.10 THEN
@@ -215,9 +274,11 @@ BEGIN
         END IF;
     ELSIF OLD.status = 'resolved' AND NEW.status = 'reopened' THEN
         -- If complaint is reopened, increment workload
-        UPDATE public.officers
-        SET workload_count = workload_count + 1
-        WHERE id = NEW.assigned_officer_id;
+        IF NEW.assigned_officer_id IS NOT NULL THEN
+            UPDATE public.officers
+            SET workload_count = workload_count + 1
+            WHERE id = NEW.assigned_officer_id;
+        END IF;
     END IF;
     RETURN NEW;
 END;
@@ -293,40 +354,194 @@ EXECUTE FUNCTION public.handle_new_officer_profile();
 ALTER TABLE public.departments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.officers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.category_department_mapping ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.complaints ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.complaint_timeline ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.visit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.feedback ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.re_inspections ENABLE ROW LEVEL SECURITY;
 
+-- Helper RLS Functions
+CREATE OR REPLACE FUNCTION public.get_my_role()
+RETURNS VARCHAR AS $$
+  SELECT role FROM public.users WHERE id = auth.uid();
+$$ LANGUAGE sql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.get_user_district()
+RETURNS VARCHAR AS $$
+  SELECT district FROM public.users WHERE id = auth.uid();
+$$ LANGUAGE sql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.get_officer_id()
+RETURNS UUID AS $$
+  SELECT id FROM public.officers WHERE user_id = auth.uid();
+$$ LANGUAGE sql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.is_cm() RETURNS BOOLEAN AS $$
+  SELECT EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'cm');
+$$ LANGUAGE sql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.is_admin() RETURNS BOOLEAN AS $$
+  SELECT EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin');
+$$ LANGUAGE sql SECURITY DEFINER;
+
+-- Policies for departments
 CREATE POLICY "Allow public read access to departments" ON public.departments FOR SELECT USING (true);
+CREATE POLICY "Allow CM/Admin write to departments" ON public.departments FOR ALL USING (public.is_cm() OR public.is_admin());
+
+-- Policies for users
 CREATE POLICY "Allow public read access to users" ON public.users FOR SELECT USING (true);
+CREATE POLICY "Allow authenticated updates to own profile" ON public.users FOR UPDATE USING (id = auth.uid());
+CREATE POLICY "Allow authenticated inserts/signups" ON public.users FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow CM/Admin full access to users" ON public.users FOR ALL USING (public.is_cm() OR public.is_admin());
+
+-- Policies for officers
 CREATE POLICY "Allow public read access to officers" ON public.officers FOR SELECT USING (true);
-CREATE POLICY "Allow public read access to complaints" ON public.complaints FOR SELECT USING (true);
+CREATE POLICY "Allow CM/Admin full access to officers" ON public.officers FOR ALL USING (public.is_cm() OR public.is_admin());
+CREATE POLICY "Allow officer update own profile" ON public.officers FOR UPDATE USING (user_id = auth.uid());
+
+-- Policies for category mapping
+CREATE POLICY "Allow public read access to mappings" ON public.category_department_mapping FOR SELECT USING (true);
+CREATE POLICY "Allow CM/Admin write to mappings" ON public.category_department_mapping FOR ALL USING (public.is_cm() OR public.is_admin());
+
+-- Policies for complaints
+CREATE POLICY "Allow select complaints" ON public.complaints FOR SELECT USING (
+  public.is_cm()
+  OR (public.is_admin() AND (public.get_user_district() IS NULL OR district = public.get_user_district()))
+  OR (public.get_my_role() = 'officer' AND assigned_officer_id = public.get_officer_id())
+  OR (public.get_my_role() = 'citizen' AND citizen_id = auth.uid())
+  OR (auth.uid() IS NULL) -- Allow public tracking without login
+);
+CREATE POLICY "Allow insert complaints" ON public.complaints FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow update complaints" ON public.complaints FOR UPDATE USING (
+  public.is_cm()
+  OR (public.is_admin() AND (public.get_user_district() IS NULL OR district = public.get_user_district()))
+  OR (public.get_my_role() = 'officer' AND assigned_officer_id = public.get_officer_id())
+  OR (public.get_my_role() = 'citizen' AND citizen_id = auth.uid())
+  OR (auth.uid() IS NULL)
+);
+
+-- Policies for timeline
 CREATE POLICY "Allow public read/write to timelines" ON public.complaint_timeline USING (true);
+
+-- Policies for visit logs
 CREATE POLICY "Allow public read access to visit logs" ON public.visit_logs FOR SELECT USING (true);
+CREATE POLICY "Allow CM/Admin write to visit logs" ON public.visit_logs FOR ALL USING (public.is_cm() OR public.is_admin());
+
+-- Policies for feedback
 CREATE POLICY "Allow public read/write to feedback" ON public.feedback USING (true);
+
+-- Policies for re-inspections
 CREATE POLICY "Allow public read/write to re-inspections" ON public.re_inspections USING (true);
 
--- Enable public insertions/updates for easier frontend prototype flow
-CREATE POLICY "Allow authenticated inserts to users" ON public.users FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow authenticated updates to users" ON public.users FOR UPDATE USING (true);
-CREATE POLICY "Allow public inserts to complaints" ON public.complaints FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow public updates to complaints" ON public.complaints FOR UPDATE USING (true);
-CREATE POLICY "Allow public updates to officers" ON public.officers FOR UPDATE USING (true);
 
 -- ------------------------------------------------------------------
--- 5. SEED DATA - DEPARTMENTS
+-- 5. SEED DATA - ALL 64 DELHI DEPARTMENTS
 -- ------------------------------------------------------------------
 INSERT INTO public.departments (id, name, code, active_officers_count, rating) VALUES
-('d0000000-0000-0000-0000-000000000001', 'Public Works Department (PWD)', 'PWD', 1, 4.2),
-('d0000000-0000-0000-0000-000000000002', 'Delhi Jal Board (DJB)', 'DJB', 1, 3.8),
-('d0000000-0000-0000-0000-000000000003', 'MCD Garbage & Sanitation', 'MCD', 1, 4.5),
-('d0000000-0000-0000-0000-000000000004', 'Power & Electricity (DISCOMs)', 'DISCOM', 1, 4.7),
-('d0000000-0000-0000-0000-000000000005', 'Delhi Police & Security', 'POLICE', 1, 4.1);
+-- Core Administrative
+('d0000000-0000-0000-0000-000000000001', 'Public Works Department (PWD)', 'PWD', 1, 3.80),
+('d0000000-0000-0000-0000-000000000002', 'Delhi Jal Board (DJB)', 'DJB', 1, 3.20),
+('d0000000-0000-0000-0000-000000000003', 'MCD Garbage & Sanitation', 'MCD', 1, 3.50),
+('d0000000-0000-0000-0000-000000000004', 'Power & Electricity (DISCOMs)', 'DISCOM', 1, 4.50),
+('d0000000-0000-0000-0000-000000000005', 'Delhi Police & Security', 'POLICE', 1, 4.10),
+('d0000000-0000-0000-0000-000000000006', 'Administrative Reforms', 'AR', 0, 5.00),
+('d0000000-0000-0000-0000-000000000007', 'Archaeology & Delhi Gazetteer', 'ARCH', 0, 5.00),
+('d0000000-0000-0000-0000-000000000008', 'Archives', 'ARCHIVES', 0, 5.00),
+('d0000000-0000-0000-0000-000000000009', 'Audit', 'AUDIT', 0, 5.00),
+('d0000000-0000-0000-0000-000000000010', 'Chief Electoral Officer', 'CEO', 0, 5.00),
+('d0000000-0000-0000-0000-000000000011', 'Development Department & its Units', 'DEV', 0, 5.00),
+('d0000000-0000-0000-0000-000000000012', 'Finance', 'FIN', 0, 5.00),
+('d0000000-0000-0000-0000-000000000013', 'General Administration', 'GAD', 0, 5.00),
+('d0000000-0000-0000-0000-000000000014', 'Information and Public Relations', 'IPR', 0, 5.00),
+('d0000000-0000-0000-0000-000000000015', 'Planning', 'PLAN', 0, 5.00),
+('d0000000-0000-0000-0000-000000000016', 'Services', 'SERVICES', 0, 5.00),
+('d0000000-0000-0000-0000-000000000017', 'Vigilance', 'VIG', 0, 5.00),
+('d0000000-0000-0000-0000-000000000018', 'Weights & Measures', 'WM', 0, 5.00),
+-- Infrastructure & Public Works
+('d0000000-0000-0000-0000-000000000019', 'Urban Development Department', 'UD', 0, 5.00),
+('d0000000-0000-0000-0000-000000000020', 'Irrigation & Flood Control', 'IFC', 0, 5.00),
+('d0000000-0000-0000-0000-000000000021', 'Power', 'POWER', 0, 5.00),
+('d0000000-0000-0000-0000-000000000022', 'Water', 'WATER', 0, 5.00),
+-- Health & Social Welfare
+('d0000000-0000-0000-0000-000000000023', 'Aruna Asaf Ali Hospital', 'AAAH', 0, 5.00),
+('d0000000-0000-0000-0000-000000000024', 'Ayurvedic and Unani Tibbia College', 'AUTC', 0, 5.00),
+('d0000000-0000-0000-0000-000000000025', 'Board of Ayurvedic and Unani System of Medicine', 'BAUSM', 0, 5.00),
+('d0000000-0000-0000-0000-000000000026', 'Central Accident and Trauma Service', 'CATS', 0, 5.00),
+('d0000000-0000-0000-0000-000000000027', 'Deen Dayal Upadhyay Hospital', 'DDUH', 0, 5.00),
+('d0000000-0000-0000-0000-000000000028', 'Delhi College of Engineering', 'DCE', 0, 5.00),
+('d0000000-0000-0000-0000-000000000029', 'Directorate of Family Welfare', 'DFW', 0, 5.00),
+('d0000000-0000-0000-0000-000000000030', 'Health Department', 'HEALTH', 0, 5.00),
+('d0000000-0000-0000-0000-000000000031', 'Social Welfare Department', 'SWD', 0, 5.00),
+('d0000000-0000-0000-0000-000000000032', 'Welfare of Scheduled Castes/Scheduled Tribes/OBC/Minorities', 'WSCST', 0, 5.00),
+('d0000000-0000-0000-0000-000000000033', 'Women & Child Development', 'WCD', 0, 5.00),
+-- Education & Training
+('d0000000-0000-0000-0000-000000000034', 'Education Department', 'EDUCATION', 0, 5.00),
+('d0000000-0000-0000-0000-000000000035', 'Higher Education', 'HEDU', 0, 5.00),
+('d0000000-0000-0000-0000-000000000036', 'Training & Technical Education', 'TTE', 0, 5.00),
+('d0000000-0000-0000-0000-000000000037', 'Directorate of Training, UTCS', 'DT_UTCS', 0, 5.00),
+('d0000000-0000-0000-0000-000000000038', 'College of Art', 'COA', 0, 5.00),
+-- Law, Safety & Justice
+('d0000000-0000-0000-0000-000000000039', 'Central Jail', 'JAIL', 0, 5.00),
+('d0000000-0000-0000-0000-000000000040', 'Chit Fund', 'CF', 0, 5.00),
+('d0000000-0000-0000-0000-000000000041', 'Consumer Affairs', 'CA', 0, 5.00),
+('d0000000-0000-0000-0000-000000000042', 'Drug Control', 'DC', 0, 5.00),
+('d0000000-0000-0000-0000-000000000043', 'Excise', 'EXCISE', 0, 5.00),
+('d0000000-0000-0000-0000-000000000044', 'Home', 'HOME', 0, 5.00),
+('d0000000-0000-0000-0000-000000000045', 'Legislative Affairs', 'LA', 0, 5.00),
+('d0000000-0000-0000-0000-000000000046', 'Lok Shikayat Ayog (Public Grievance Commission)', 'LSA', 0, 5.00),
+('d0000000-0000-0000-0000-000000000047', 'State Election Commission', 'SEC', 0, 5.00),
+-- Transport
+('d0000000-0000-0000-0000-000000000048', 'Delhi Transport Corporation (DTC)', 'DTC', 0, 5.00),
+('d0000000-0000-0000-0000-000000000049', 'Delhi Transco Ltd', 'TRANSCO', 0, 5.00),
+('d0000000-0000-0000-0000-000000000050', 'Transport Department', 'TRANS', 0, 5.00),
+-- Environment
+('d0000000-0000-0000-0000-000000000051', 'Agricultural Marketing (Directorate)', 'AM', 0, 5.00),
+('d0000000-0000-0000-0000-000000000052', 'Agriculture Department', 'AGRI', 0, 5.00),
+('d0000000-0000-0000-0000-000000000053', 'Conservator of Forest', 'CFOREST', 0, 5.00),
+('d0000000-0000-0000-0000-000000000054', 'Environment Department', 'ENV', 0, 5.00),
+('d0000000-0000-0000-0000-000000000055', 'Forest Department', 'FOREST', 0, 5.00),
+('d0000000-0000-0000-0000-000000000056', 'Food Safety (Department of)', 'FOODS', 0, 5.00),
+('d0000000-0000-0000-0000-000000000057', 'Food & Supplies', 'FOOD_SUPP', 0, 5.00),
+-- Revenue & Finance
+('d0000000-0000-0000-0000-000000000058', 'Revenue Department', 'REV', 0, 5.00),
+('d0000000-0000-0000-0000-000000000059', 'Trade and Taxes Department', 'TAX', 0, 5.00),
+('d0000000-0000-0000-0000-000000000060', 'Cooperative Societies (Registrar)', 'RCS', 0, 5.00),
+('d0000000-0000-0000-0000-000000000061', 'Delhi Disaster Management Authority (DDMA)', 'DDMA', 0, 5.00),
+-- Other
+('d0000000-0000-0000-0000-000000000062', 'Delhi Fire Service', 'FIRE', 0, 5.00),
+('d0000000-0000-0000-0000-000000000063', 'Employment', 'EMP', 0, 5.00),
+('d0000000-0000-0000-0000-000000000064', 'Industries Department', 'IND', 0, 5.00),
+('d0000000-0000-0000-0000-000000000065', 'Tourism Department', 'TOUR', 0, 5.00),
+('d0000000-0000-0000-0000-000000000066', 'Hospital Department', 'HOSPITAL', 0, 5.00),
+('d0000000-0000-0000-0000-000000000067', 'Delhi Archives', 'D_ARCHIVES', 0, 5.00),
+('d0000000-0000-0000-0000-000000000068', 'Food & Supply', 'FOOD_SUPPLY', 0, 5.00),
+-- Autonomous
+('d0000000-0000-0000-0000-000000000069', 'New Delhi Municipal Council (NDMC)', 'NDMC', 0, 5.00)
+ON CONFLICT (code) DO UPDATE 
+SET name = EXCLUDED.name;
 
 -- ------------------------------------------------------------------
--- 6. SEED DATA - AUTH USERS (PASSWORD IS 'password' FOR ALL)
+-- 6. SEED DATA - DEFAULT CATEGORY MAPPINGS
+-- ------------------------------------------------------------------
+INSERT INTO public.category_department_mapping (category, department_id, priority) VALUES
+('Roads / Potholes', 'd0000000-0000-0000-0000-000000000001', 1), -- PWD
+('Water Leakage / Shortage', 'd0000000-0000-0000-0000-000000000002', 1), -- DJB
+('Garbage / Waste Pile', 'd0000000-0000-0000-0000-000000000003', 1), -- MCD
+('Streetlight / Power Outage', 'd0000000-0000-0000-0000-000000000004', 1), -- DISCOM
+('Public Nuisance / Safety', 'd0000000-0000-0000-0000-000000000005', 1), -- POLICE
+('Sewage Overflow', 'd0000000-0000-0000-0000-000000000002', 1), -- DJB
+('Road Damage', 'd0000000-0000-0000-0000-000000000001', 1), -- PWD
+('Tree Fall / Trimming', 'd0000000-0000-0000-0000-000000000055', 1), -- Forest Department
+('Stray Animals', 'd0000000-0000-0000-0000-000000000003', 1), -- MCD
+('Traffic Violation', 'd0000000-0000-0000-0000-000000000005', 1), -- POLICE
+('Health & Clinics / Hospitals', 'd0000000-0000-0000-0000-000000000030', 1),
+('School Education / Infrastructure', 'd0000000-0000-0000-0000-000000000034', 1)
+ON CONFLICT (category) DO UPDATE
+SET department_id = EXCLUDED.department_id, priority = EXCLUDED.priority;
+
+-- ------------------------------------------------------------------
+-- 7. SEED DATA - AUTH USERS (PASSWORD IS 'password' FOR ALL)
 -- ------------------------------------------------------------------
 
 -- Delete existing users to prevent duplicate key violations (cascades to identities)
@@ -514,7 +729,7 @@ INSERT INTO auth.identities (
 );
 
 -- ------------------------------------------------------------------
--- 7. SEED DATA - PUBLIC USERS
+-- 8. SEED DATA - PUBLIC USERS
 -- ------------------------------------------------------------------
 INSERT INTO public.users (id, email, role, phone, district, full_name, department_id) VALUES
 ('00000000-0000-0000-0000-000000000001', 'cm@delhi.gov.in', 'cm', '9876543201', 'New Delhi', 'Hon''ble Chief Minister', NULL),
@@ -527,13 +742,12 @@ INSERT INTO public.users (id, email, role, phone, district, full_name, departmen
 -- (The trigger `trigger_handle_new_officer_profile` will automatically insert rows into `public.officers` for user 3, 4, and 5)
 
 -- ------------------------------------------------------------------
--- 8. SEED DATA - COMPLAINTS
+-- 9. SEED DATA - COMPLAINTS
 -- ------------------------------------------------------------------
--- We wait 1 sec to ensure officers are populated
 INSERT INTO public.complaints (id, tracking_no, title, description, category, department_id, status, severity, district, latitude, longitude, photo_before, citizen_id, created_at, updated_at) VALUES
 (
     'c0000000-0000-0000-0000-000000000001',
-    'DL-2026-8921',
+    'CMP-2026-8921',
     'Severe pothole cluster on Ring Road near Lajpat Nagar',
     'A cluster of deep potholes is causing severe traffic congestion and minor accidents. Needs immediate resurfacing.',
     'Roads / Potholes',
@@ -550,7 +764,7 @@ INSERT INTO public.complaints (id, tracking_no, title, description, category, de
 ),
 (
     'c0000000-0000-0000-0000-000000000002',
-    'DL-2026-4421',
+    'CMP-2026-4421',
     'Major water pipe burst near Dwarka Mor Metro',
     'Drinking water has been leaking continuously from an underground main line, flooding the main corridor.',
     'Water Leakage / Shortage',
@@ -567,7 +781,7 @@ INSERT INTO public.complaints (id, tracking_no, title, description, category, de
 ),
 (
     'c0000000-0000-0000-0000-000000000003',
-    'DL-2026-3091',
+    'CMP-2026-3091',
     'Garbage dump near primary school in Karol Bagh',
     'An unauthorized trash dumping spot has developed directly adjacent to the MCD Primary School, creating severe hygienic risks.',
     'Garbage / Waste Pile',
@@ -584,7 +798,7 @@ INSERT INTO public.complaints (id, tracking_no, title, description, category, de
 ),
 (
     'c0000000-0000-0000-0000-000000000004',
-    'DL-2026-1211',
+    'CMP-2026-1211',
     'Lack of policing & lighting in Connaught Place outer circle pocket',
     'Multiple streetlights are broken. Anti-social elements gather after dark, making it unsafe for pedestrians.',
     'Public Nuisance / Safety',
@@ -608,7 +822,7 @@ SET photo_after = 'https://images.unsplash.com/photo-1618477388954-7852f32655ec?
 WHERE id = 'c0000000-0000-0000-0000-000000000003';
 
 -- ------------------------------------------------------------------
--- 9. SEED DATA - VISIT LOGS
+-- 10. SEED DATA - VISIT LOGS
 -- ------------------------------------------------------------------
 INSERT INTO public.visit_logs (district, visit_date, purpose, notes, complaint_count_at_visit) VALUES
 ('West Delhi', current_date - interval '10 days', 'Sub-division hospital review & drainage progress inspection', 'Reviewed 15 complaints, ordered immediate action on water logging near metro.', 15),

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Box, Typography, Grid, Paper, Card, CardContent, FormControl, Select, MenuItem, InputLabel, Button, Alert, List, ListItem, ListItemText, LinearProgress, Stack, Chip 
+  Box, Typography, Grid, Paper, Card, CardContent, FormControl, Select, MenuItem, InputLabel, Button, Alert, List, ListItem, ListItemText, LinearProgress, Stack, Chip, TextField 
 } from '@mui/material';
 import { 
   Assignment as TotalIcon, 
@@ -8,7 +8,8 @@ import {
   Warning as EscalatedIcon, 
   HourglassEmpty as PendingIcon,
   PictureAsPdf as PdfIcon,
-  TableChart as ExcelIcon
+  TableChart as ExcelIcon,
+  Search as SearchIcon
 } from '@mui/icons-material';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useNavigate } from 'react-router-dom';
@@ -18,6 +19,7 @@ import { reportService } from '../services/reportService';
 import { useNotification } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
 import StatusBadge from '../components/common/StatusBadge';
+import { isMock, supabase } from '../services/supabaseClient';
 
 const DISTRICTS = [
   'All', 'New Delhi', 'North Delhi', 'South Delhi', 'East Delhi', 'West Delhi', 
@@ -29,18 +31,20 @@ export default function CMDashboard() {
   const { showNotification } = useNotification();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [district, setDistrict] = useState('All');
+  const [district, setDistrict] = useState(user?.role === 'admin' ? user.district || 'Central Delhi' : 'All');
   const [kpis, setKpis] = useState({
     total: 0, resolved: 0, escalated: 0, pending: 0, assigned: 0, inProgress: 0, reopened: 0, resolutionRate: 0, avgResolutionTime: '0 Days'
   });
   const [trends, setTrends] = useState([]);
   const [departmentStats, setDepartmentStats] = useState([]);
+  const [deptSearch, setDeptSearch] = useState('');
+  const [deptFilter, setDeptFilter] = useState('active'); // 'active' or 'all'
   const [criticalComplaints, setCriticalComplaints] = useState([]);
   const [rawComplaints, setRawComplaints] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (showLoader = true) => {
+    if (showLoader) setLoading(true);
     try {
       const filters = { district };
       const fetchedKPIs = await analyticsService.getDashboardKPIs(filters);
@@ -58,14 +62,77 @@ export default function CMDashboard() {
       setRawComplaints(complaintsList);
     } catch (err) {
       console.error(err);
-      showNotification('Error loading dashboard statistics.', 'error');
+      if (showLoader) showNotification('Error loading dashboard statistics.', 'error');
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    loadData(true);
+
+    // 1. Live Supabase Realtime Subscription
+    let channel = null;
+    let deptChannel = null;
+    if (!isMock) {
+      channel = supabase
+        .channel('cm-db-realtime-complaints')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'complaints' }, () => {
+          console.log('Realtime change in complaints table detected. Refreshing CM dashboard...');
+          loadData(false);
+        })
+        .subscribe();
+
+      deptChannel = supabase
+        .channel('cm-db-realtime-depts')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'departments' }, () => {
+          console.log('Realtime change in departments table detected. Refreshing CM dashboard...');
+          loadData(false);
+        })
+        .subscribe();
+    }
+
+    // 2. Offline Mock Database Polling loop (re-fetches when storage changes)
+    const initialComplaints = localStorage.getItem('delhi_complaints');
+    const initialDepts = localStorage.getItem('delhi_departments');
+    let lastComplaintsLength = initialComplaints ? initialComplaints.length : 0;
+    let lastDeptsLength = initialDepts ? initialDepts.length : 0;
+
+    const interval = setInterval(() => {
+      const currentComplaints = localStorage.getItem('delhi_complaints');
+      const currentDepts = localStorage.getItem('delhi_departments');
+      
+      let changed = false;
+      if (currentComplaints) {
+        const length = currentComplaints.length;
+        if (lastComplaintsLength !== 0 && length !== lastComplaintsLength) {
+          changed = true;
+        }
+        lastComplaintsLength = length;
+      }
+      if (currentDepts) {
+        const length = currentDepts.length;
+        if (lastDeptsLength !== 0 && length !== lastDeptsLength) {
+          changed = true;
+        }
+        lastDeptsLength = length;
+      }
+      
+      if (changed) {
+        console.log('Mock database change detected in local storage. Refreshing dashboard...');
+        loadData(false);
+      }
+    }, 3000);
+
+    return () => {
+      if (channel && !isMock) {
+        supabase.removeChannel(channel);
+      }
+      if (deptChannel && !isMock) {
+        supabase.removeChannel(deptChannel);
+      }
+      clearInterval(interval);
+    };
   }, [district]);
 
   const handleExportPDF = () => {
@@ -129,8 +196,8 @@ export default function CMDashboard() {
       </Stack>
 
       {/* District Filter Selector */}
-      <Paper elevation={1} sx={{ p: 2, mb: 3, borderRadius: '12px', display: 'flex', alignItems: 'center', gap: 2 }}>
-        <FormControl variant="outlined" size="small" sx={{ minWidth: 200 }}>
+      <Paper elevation={1} sx={{ p: 2, mb: 3, borderRadius: '12px', display: 'flex', alignItems: 'center', gap: 2, borderLeft: user?.role === 'admin' ? '5px solid #FF9933' : 'none' }}>
+        <FormControl variant="outlined" size="small" sx={{ minWidth: 200 }} disabled={user?.role === 'admin'}>
           <InputLabel id="district-filter-label">Filter District</InputLabel>
           <Select
             labelId="district-filter-label"
@@ -142,7 +209,9 @@ export default function CMDashboard() {
           </Select>
         </FormControl>
         <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
-          Showing stats for {district === 'All' ? 'all 11 Delhi Districts' : `${district} District`}
+          {user?.role === 'admin' 
+            ? `Locked to your assigned district: ${district}` 
+            : `Showing stats for ${district === 'All' ? 'all 11 Delhi Districts' : `${district} District`}`}
         </Typography>
       </Paper>
 
@@ -249,46 +318,269 @@ export default function CMDashboard() {
 
         {/* Department Rankings */}
         <Grid item xs={12} lg={4}>
-          <Paper elevation={2} sx={{ p: 3, borderRadius: '14px', border: '1px solid #E2E8F0', height: '100%', minHeight: 380 }}>
-            <Typography variant="h6" sx={{ fontFamily: '"Outfit", sans-serif', fontWeight: 700, color: '#0A2540', mb: 2 }}>
-              Department Rating & Load
-            </Typography>
-            <List>
-              {departmentStats.map((dept, idx) => (
-                <Box key={dept.code} sx={{ mb: 2 }}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1E293B' }}>
-                      {dept.name}
+          <Paper elevation={2} sx={{ p: 3, borderRadius: '14px', border: '1px solid #E2E8F0', height: '100%', minHeight: 380, display: 'flex', flexDirection: 'column' }}>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
+              <Typography variant="h6" sx={{ fontFamily: '"Outfit", sans-serif', fontWeight: 700, color: '#0A2540' }}>
+                Department Telemetry
+              </Typography>
+              <Box 
+                sx={{ 
+                  width: 8, 
+                  height: 8, 
+                  borderRadius: '50%', 
+                  bgcolor: '#10B981', 
+                  animation: 'pulse 1.5s infinite',
+                  '@keyframes pulse': {
+                    '0%': { transform: 'scale(0.95)', boxShadow: '0 0 0 0 rgba(16, 185, 129, 0.7)' },
+                    '70%': { transform: 'scale(1)', boxShadow: '0 0 0 6px rgba(16, 185, 129, 0)' },
+                    '100%': { transform: 'scale(0.95)', boxShadow: '0 0 0 0 rgba(16, 185, 129, 0)' }
+                  }
+                }} 
+              />
+              <Typography variant="caption" sx={{ color: '#10B981', fontWeight: 700, fontSize: 10, textTransform: 'uppercase' }}>
+                Live
+              </Typography>
+            </Stack>
+
+            {/* Search and Filters */}
+            <Stack spacing={1.5} sx={{ mb: 2 }}>
+              <TextField
+                placeholder="Search departments..."
+                variant="outlined"
+                size="small"
+                value={deptSearch}
+                onChange={(e) => setDeptSearch(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <SearchIcon sx={{ color: '#94A3B8', mr: 1, fontSize: 20 }} />
+                  ),
+                  sx: { borderRadius: '8px', fontSize: 13 }
+                }}
+                fullWidth
+              />
+              <Stack direction="row" spacing={2} sx={{ borderBottom: '1px solid #E2E8F0', pb: 0.5 }}>
+                <Button
+                  size="small"
+                  onClick={() => setDeptFilter('active')}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 700,
+                    fontSize: 12,
+                    color: deptFilter === 'active' ? '#FF9933' : '#64748B',
+                    borderBottom: deptFilter === 'active' ? '2px solid #FF9933' : 'none',
+                    borderRadius: 0,
+                    minWidth: 0,
+                    px: 1,
+                    pb: 0.5,
+                    '&:hover': { bgcolor: 'transparent' }
+                  }}
+                >
+                  Active Only
+                </Button>
+                <Button
+                  size="small"
+                  onClick={() => setDeptFilter('all')}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 700,
+                    fontSize: 12,
+                    color: deptFilter === 'all' ? '#FF9933' : '#64748B',
+                    borderBottom: deptFilter === 'all' ? '2px solid #FF9933' : 'none',
+                    borderRadius: 0,
+                    minWidth: 0,
+                    px: 1,
+                    pb: 0.5,
+                    '&:hover': { bgcolor: 'transparent' }
+                  }}
+                >
+                  All ({departmentStats.length})
+                </Button>
+              </Stack>
+            </Stack>
+
+            <List sx={{ flexGrow: 1, maxHeight: 290, overflowY: 'auto', pr: 1, '&::-webkit-scrollbar': { width: '4px' }, '&::-webkit-scrollbar-thumb': { backgroundColor: '#CBD5E1', borderRadius: '4px' } }}>
+              {(() => {
+                const filteredDepts = departmentStats.filter(dept => {
+                  const matchesSearch = dept.name.toLowerCase().includes(deptSearch.toLowerCase()) || 
+                                        dept.code.toLowerCase().includes(deptSearch.toLowerCase());
+                  const matchesFilter = deptFilter === 'all' ? true : dept.total > 0;
+                  return matchesSearch && matchesFilter;
+                });
+
+                if (filteredDepts.length === 0) {
+                  return (
+                    <Typography variant="body2" sx={{ color: '#94A3B8', fontStyle: 'italic', textAlign: 'center', py: 4 }}>
+                      No matching departments found
                     </Typography>
-                    <Chip 
-                      label={`${dept.rating} ★`} 
-                      size="small" 
-                      color={dept.rating >= 4.0 ? 'success' : dept.rating >= 3.5 ? 'warning' : 'error'}
-                      sx={{ fontWeight: 800, height: 20, fontSize: 10 }} 
-                    />
-                  </Stack>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={dept.rate} 
-                    sx={{ 
-                      height: 6, 
-                      borderRadius: 3, 
-                      backgroundColor: '#F1F5F9',
-                      '& .MuiLinearProgress-bar': {
-                        backgroundColor: dept.rate > 70 ? '#138808' : '#FF9933'
-                      }
-                    }} 
-                  />
-                  <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.5 }}>
-                    <Typography variant="caption" sx={{ color: '#64748B' }}>
-                      Resolved: {dept.resolved}/{dept.total}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
-                      Rate: {dept.rate}%
-                    </Typography>
-                  </Stack>
-                </Box>
-              ))}
+                  );
+                }
+
+                return filteredDepts.map((dept) => {
+                  // Determine status color and text
+                  let statusText = 'No Active Cases';
+                  let statusBg = '#F1F5F9';
+                  let statusColor = '#64748B';
+                  
+                  if (dept.total > 0) {
+                    if (dept.rate >= 80) {
+                      statusText = 'Outstanding';
+                      statusBg = '#D1FAE5';
+                      statusColor = '#065F46';
+                    } else if (dept.rate >= 50) {
+                      statusText = 'Needs Attention';
+                      statusBg = '#FEF3C7';
+                      statusColor = '#92400E';
+                    } else {
+                      statusText = 'SLA Alert';
+                      statusBg = '#FEE2E2';
+                      statusColor = '#991B1B';
+                    }
+                    if (dept.escalated > 0) {
+                      statusText = 'Critical Alert';
+                      statusBg = '#FEE2E2';
+                      statusColor = '#B91C1C';
+                    }
+                  }
+
+                  return (
+                    <Box 
+                      key={dept.code} 
+                      sx={{ 
+                        mb: 2, 
+                        p: 1.5, 
+                        borderRadius: '10px', 
+                        border: '1px solid #F1F5F9',
+                        bgcolor: dept.total > 0 ? '#fff' : '#FAFAFA',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                        transition: 'all 0.2s',
+                        '&:hover': {
+                          borderColor: '#E2E8F0',
+                          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+                          transform: 'translateY(-1px)'
+                        }
+                      }}
+                    >
+                      <Stack direction="row" justifyContent="space-between" alignItems="start" sx={{ mb: 1 }}>
+                        <Box sx={{ maxWidth: '65%' }}>
+                          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                            <Chip 
+                              label={dept.code} 
+                              size="small" 
+                              sx={{ 
+                                fontWeight: 800, 
+                                height: 16, 
+                                fontSize: 9,
+                                bgcolor: '#0A2540',
+                                color: '#fff'
+                              }} 
+                            />
+                            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0A2540', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={dept.name}>
+                              {dept.name.replace('Department', 'Dept.')}
+                            </Typography>
+                          </Stack>
+                        </Box>
+                        
+                        <Stack direction="row" spacing={0.5} alignItems="center">
+                          <Chip 
+                            label={statusText} 
+                            size="small" 
+                            sx={{ 
+                              fontWeight: 700, 
+                              height: 18, 
+                              fontSize: 9,
+                              bgcolor: statusBg,
+                              color: statusColor
+                            }} 
+                          />
+                          <Chip 
+                            label={`${parseFloat(dept.rating).toFixed(1)} ★`} 
+                            size="small" 
+                            sx={{ 
+                              fontWeight: 800, 
+                              height: 18, 
+                              fontSize: 9,
+                              bgcolor: '#FFFBEB',
+                              color: '#D97706',
+                              border: '1px solid #FDE68A'
+                            }} 
+                          />
+                        </Stack>
+                      </Stack>
+
+                      {dept.total > 0 ? (
+                        <>
+                          <LinearProgress 
+                            variant="determinate" 
+                            value={dept.rate} 
+                            sx={{ 
+                              height: 6, 
+                              borderRadius: 3, 
+                              backgroundColor: '#F1F5F9',
+                              my: 1,
+                              '& .MuiLinearProgress-bar': {
+                                backgroundColor: dept.rate >= 80 ? '#138808' : dept.rate >= 50 ? '#FF9933' : '#EF4444'
+                              }
+                            }} 
+                          />
+                          
+                          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 0.5 }}>
+                            <Typography variant="caption" sx={{ color: '#475569', fontSize: 10 }}>
+                              Resolved: <b>{dept.resolved}</b> / <b>{dept.total}</b>
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#0A2540', fontWeight: 800, fontSize: 10 }}>
+                              {dept.rate}% Solved
+                            </Typography>
+                          </Stack>
+
+                          {/* Mini breakdowns */}
+                          <Stack direction="row" spacing={0.5} sx={{ mt: 1, flexWrap: 'wrap', gap: 0.5 }}>
+                            <Chip 
+                              label={`Pending: ${dept.pending}`} 
+                              size="small" 
+                              variant="outlined" 
+                              sx={{ 
+                                fontSize: 9, 
+                                height: 18, 
+                                color: '#D97706', 
+                                borderColor: 'rgba(217, 119, 6, 0.3)', 
+                                bgcolor: 'rgba(217, 119, 6, 0.02)' 
+                              }} 
+                            />
+                            <Chip 
+                              label={`In Progress: ${dept.inProgress}`} 
+                              size="small" 
+                              variant="outlined" 
+                              sx={{ 
+                                fontSize: 9, 
+                                height: 18, 
+                                color: '#2563EB', 
+                                borderColor: 'rgba(37, 99, 235, 0.3)', 
+                                bgcolor: 'rgba(37, 99, 235, 0.02)' 
+                              }} 
+                            />
+                            <Chip 
+                              label={`Escalated: ${dept.escalated}`} 
+                              size="small" 
+                              sx={{ 
+                                fontSize: 9, 
+                                height: 18, 
+                                fontWeight: dept.escalated > 0 ? 800 : 400,
+                                color: dept.escalated > 0 ? '#fff' : '#475569', 
+                                bgcolor: dept.escalated > 0 ? '#DC2626' : 'rgba(71, 85, 105, 0.06)',
+                                border: dept.escalated > 0 ? 'none' : '1px solid rgba(71, 85, 105, 0.15)'
+                              }} 
+                            />
+                          </Stack>
+                        </>
+                      ) : (
+                        <Typography variant="caption" sx={{ color: '#94A3B8', fontStyle: 'italic', display: 'block', mt: 1 }}>
+                          No grievances registered in system.
+                        </Typography>
+                      )}
+                    </Box>
+                  );
+                });
+              })()}
             </List>
           </Paper>
         </Grid>

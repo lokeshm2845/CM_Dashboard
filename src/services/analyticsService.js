@@ -1,5 +1,6 @@
 import { isMock, supabase } from './supabaseClient';
 import { complaintService } from './complaintService';
+import { departmentService } from './departmentService';
 
 export const analyticsService = {
   getDashboardKPIs: async (filters = {}) => {
@@ -64,39 +65,56 @@ export const analyticsService = {
 
   getDepartmentMetrics: async (filters = {}) => {
     const complaints = await complaintService.getComplaints(filters);
-    const departments = [
-      { code: 'PWD', name: 'Public Works Department' },
-      { code: 'DJB', name: 'Delhi Jal Board' },
-      { code: 'MCD', name: 'MCD Sanitation' },
-      { code: 'DISCOM', name: 'Power & DISCOMs' },
-      { code: 'POLICE', name: 'Delhi Police' }
-    ];
+    
+    // Fetch all active departments dynamically
+    let depts = [];
+    try {
+      depts = await departmentService.getDepartments();
+    } catch (e) {
+      console.warn('Error fetching dynamic departments for analytics, using fallback:', e);
+      depts = [
+        { code: 'PWD', name: 'Public Works Department (PWD)', rating: 3.8 },
+        { code: 'DJB', name: 'Delhi Jal Board (DJB)', rating: 3.2 },
+        { code: 'MCD', name: 'MCD Garbage & Sanitation', rating: 3.5 },
+        { code: 'DISCOM', name: 'Power & Electricity (DISCOMs)', rating: 4.5 },
+        { code: 'POLICE', name: 'Delhi Police & Security', rating: 4.1 }
+      ];
+    }
 
-    return departments.map(dept => {
-      const deptComps = complaints.filter(c => c.department_code === dept.code || c.departments?.code === dept.code);
+    return depts.map(dept => {
+      // Filter complaints matching this department
+      const deptComps = complaints.filter(c => 
+        c.department_code === dept.code || 
+        c.departments?.code === dept.code ||
+        c.department_id === dept.id
+      );
       const total = deptComps.length;
       const resolved = deptComps.filter(c => c.status === 'resolved').length;
       const escalated = deptComps.filter(c => c.status === 'escalated').length;
+      const pending = deptComps.filter(c => c.status === 'pending').length;
+      const inProgress = deptComps.filter(c => c.status === 'in_progress' || c.status === 'assigned' || c.status === 'reopened').length;
+      const unresolved = total - resolved;
       const rate = total > 0 ? Math.round((resolved / total) * 100) : 0;
-
-      // Mock rating depending on department efficiency
-      let rating = 4.2;
-      if (dept.code === 'PWD') rating = 3.8;
-      if (dept.code === 'DJB') rating = 3.2;
-      if (dept.code === 'MCD') rating = 3.5;
-      if (dept.code === 'DISCOM') rating = 4.5;
-      if (dept.code === 'POLICE') rating = 4.1;
 
       return {
         code: dept.code,
         name: dept.name,
         total,
         resolved,
+        unresolved,
         escalated,
+        pending,
+        inProgress,
         rate,
-        rating
+        rating: dept.rating || 5.0
       };
-    }).sort((a,b) => b.total - a.total);
+    }).sort((a, b) => {
+      // Sort by total complaints descending, then by name alphabetically
+      if (b.total !== a.total) {
+        return b.total - a.total;
+      }
+      return a.name.localeCompare(b.name);
+    });
   },
 
   getTimelineMetrics: async () => {
