@@ -3,9 +3,12 @@ import { AppBar, Toolbar, Typography, Button, Box, Chip, IconButton, Badge, Menu
 import { Menu as MenuIcon, Notifications, AccountCircle, ExitToApp, Warning as WarningIcon, QueryBuilder as ClockIcon } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '../../context/LanguageContext';
+import LanguageSelector from './LanguageSelector';
 
 export default function Navbar({ onToggleSidebar }) {
   const { user, logout } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   // Anchor States
@@ -20,10 +23,10 @@ export default function Navbar({ onToggleSidebar }) {
 
   const getRoleLabel = (role) => {
     switch (role) {
-      case 'cm': return 'Hon\'ble CM Cell';
-      case 'admin': return 'State Admin';
-      case 'officer': return `Officer (${user?.department_code || 'Dept'})`;
-      case 'citizen': return 'Citizen';
+      case 'cm': return t('roleCm');
+      case 'admin': return t('roleAdmin');
+      case 'officer': return `${t('roleOfficer')} (${user?.department_code || 'Dept'})`;
+      case 'citizen': return t('roleCitizen');
       default: return 'User';
     }
   };
@@ -91,10 +94,10 @@ export default function Navbar({ onToggleSidebar }) {
           </Box>
           <Box>
             <Typography variant="h6" noWrap component="div" sx={{ fontFamily: '"Outfit", sans-serif', fontWeight: 700, letterSpacing: 0.5, fontSize: { xs: '1rem', md: '1.25rem' } }}>
-              DELHI GOVERNMENT
+              {t('delhiGovernment')}
             </Typography>
             <Typography variant="caption" sx={{ display: { xs: 'none', sm: 'block' }, fontSize: 10, letterSpacing: 1, color: 'rgba(255,255,255,0.7)', mt: -0.5, fontWeight: 500 }}>
-              CM GRIEVANCE REDRESSAL MONITOR
+              {t('monitorSubtitle')}
             </Typography>
           </Box>
         </Box>
@@ -126,6 +129,8 @@ export default function Navbar({ onToggleSidebar }) {
               </Typography>
             </Box>
 
+            <LanguageSelector sx={{ mr: 1 }} />
+            
             {/* Notification bell triggers popover */}
             <IconButton color="inherit" size="small" onClick={handleNotifyOpen}>
               <Badge badgeContent={notifications.length} color="error">
@@ -143,7 +148,7 @@ export default function Navbar({ onToggleSidebar }) {
             >
               <Box sx={{ p: 2, backgroundColor: '#0A2540', color: '#fff', borderTopLeftRadius: '11px', borderTopRightRadius: '11px' }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                  Recent System Notifications
+                  {t('notificationsTitle')}
                 </Typography>
               </Box>
               <List sx={{ py: 0 }}>
@@ -206,7 +211,7 @@ export default function Navbar({ onToggleSidebar }) {
               <Divider />
               <MenuItem onClick={() => { handleProfileClose(); logout(); }} sx={{ py: 1, color: '#B91C1C', gap: 1 }}>
                 <ExitToApp sx={{ fontSize: 18 }} />
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>Log Out</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>{t('logout')}</Typography>
               </MenuItem>
             </Menu>
           </Box>

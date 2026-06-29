@@ -1,21 +1,24 @@
 import React from 'react';
 import { Chip, Box } from '@mui/material';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function StatusBadge({ status }) {
+  const { t } = useLanguage();
+  
   const getStatusStyles = (st) => {
     switch (st) {
       case 'pending':
-        return { label: 'Pending Routing', color: '#64748B', bgColor: '#F1F5F9' };
+        return { label: t('pending', 'Pending Routing'), color: '#64748B', bgColor: '#F1F5F9' };
       case 'assigned':
-        return { label: 'Assigned', color: '#1E40AF', bgColor: '#DBEAFE' };
+        return { label: t('assigned', 'Assigned'), color: '#1E40AF', bgColor: '#DBEAFE' };
       case 'in_progress':
-        return { label: 'In Progress', color: '#D97706', bgColor: '#FEF3C7' };
+        return { label: t('in_progress', 'In Progress'), color: '#D97706', bgColor: '#FEF3C7' };
       case 'resolved':
-        return { label: 'Resolved', color: '#047857', bgColor: '#D1FAE5' };
+        return { label: t('resolved', 'Resolved'), color: '#047857', bgColor: '#D1FAE5' };
       case 'reopened':
-        return { label: 'Reopened', color: '#B91C1C', bgColor: '#FEE2E2' };
+        return { label: t('reopened', 'Reopened'), color: '#B91C1C', bgColor: '#FEE2E2' };
       case 'escalated':
-        return { label: 'Escalated to CM', color: '#7F1D1D', bgColor: '#FFE4E6' };
+        return { label: t('escalated', 'Escalated to CM'), color: '#7F1D1D', bgColor: '#FFE4E6' };
       default:
         return { label: st, color: '#334155', bgColor: '#E2E8F0' };
     }

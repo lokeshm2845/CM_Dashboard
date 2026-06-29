@@ -13,12 +13,14 @@ import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import StatusBadge from '../components/common/StatusBadge';
 import SocialShare from '../components/common/SocialShare';
+import { useLanguage } from '../context/LanguageContext';
 
 import { DISTRICTS, COMPLAINT_CATEGORIES as CATEGORIES } from '../utils/constants';
 
 export default function TrackComplaint() {
   const { user } = useAuth();
   const { showNotification } = useNotification();
+  const { t, tCategory, tDistrict } = useLanguage();
   const [tabValue, setTabValue] = useState(0);
 
   // Intake state
@@ -135,10 +137,10 @@ export default function TrackComplaint() {
     <Container maxWidth="md" sx={{ py: 4 }} className="fade-in">
       <Box sx={{ textAlign: 'center', mb: 4 }}>
         <Typography variant="h4" sx={{ fontFamily: '"Outfit", sans-serif', fontWeight: 800, color: '#0A2540' }}>
-          Citizen Redressal Desk
+          {t('citizenRedressalDesk')}
         </Typography>
         <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5 }}>
-          File a new civic issue or track the resolution lifecycle of a previously filed complaint.
+          {t('citizenRedressalSubtitle')}
         </Typography>
       </Box>
 
@@ -154,9 +156,9 @@ export default function TrackComplaint() {
             '& .MuiTabs-indicator': { backgroundColor: '#FF9933', height: 3 }
           }}
         >
-          <Tab label="Submit New Grievance" />
-          <Tab label="Track Status & Feedback" />
-          {user && user.role === 'citizen' && <Tab label="My Filed Grievances" />}
+          <Tab label={t('submitNewGrievance')} />
+          <Tab label={t('trackStatusFeedback')} />
+          {user && user.role === 'citizen' && <Tab label={t('myFiledGrievances')} />}
         </Tabs>
 
         <Box sx={{ p: 4 }}>
@@ -167,13 +169,13 @@ export default function TrackComplaint() {
                 <Box sx={{ textAlign: 'center', py: 4 }}>
                   <SuccessIcon sx={{ fontSize: 60, color: '#138808', mb: 2 }} />
                   <Typography variant="h5" sx={{ fontWeight: 800, color: '#0A2540', mb: 1 }}>
-                    Grievance Registered Successfully
+                    {t('grievanceRegistered')}
                   </Typography>
                   <Typography variant="body1" sx={{ color: '#475569', mb: 3 }}>
-                    Your tracking reference ID is: <b style={{ color: '#FF9933', fontSize: 20 }}>{submittedId}</b>
+                    {t('trackingRefId')} <b style={{ color: '#FF9933', fontSize: 20 }}>{submittedId}</b>
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#64748B', mb: 3 }}>
-                    The issue has been auto-routed to the department engineer with the lowest active workload count. Copy this ID to track live updates.
+                    {t('workloadDetail')}
                   </Typography>
                   <Stack direction="row" spacing={2} justifyContent="center">
                     <Button 
@@ -181,7 +183,7 @@ export default function TrackComplaint() {
                       onClick={() => setSubmittedId(null)}
                       sx={{ textTransform: 'none', backgroundColor: '#0A2540' }}
                     >
-                      File Another Grievance
+                      {t('fileAnotherGrievance')}
                     </Button>
                     <Button 
                       variant="outlined" 
@@ -195,7 +197,7 @@ export default function TrackComplaint() {
                       }}
                       sx={{ textTransform: 'none' }}
                     >
-                      Track Progress
+                      {t('trackProgress')}
                     </Button>
                   </Stack>
                 </Box>
@@ -204,57 +206,57 @@ export default function TrackComplaint() {
                   <Grid container spacing={3}>
                     <Grid item xs={12}>
                       <TextField
-                        label="Grievance Title / Short Summary"
+                        label={t('grievanceTitle')}
                         fullWidth
                         required
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
-                        placeholder="e.g. Broken water pipe leaking on Main Marg"
+                        placeholder={t('titlePlaceholder')}
                       />
                     </Grid>
                     
                     <Grid item xs={12}>
                       <TextField
-                        label="Detailed Description"
+                        label={t('detailedDescription')}
                         multiline
                         rows={4}
                         fullWidth
                         required
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
-                        placeholder="Provide exact landmark details, when it occurred, and specific requests..."
+                        placeholder={t('descriptionPlaceholder')}
                       />
                     </Grid>
 
                     <Grid item xs={12} sm={6}>
                       <FormControl fullWidth required>
-                        <InputLabel>Category / Service Area</InputLabel>
+                        <InputLabel>{t('categoryServiceArea')}</InputLabel>
                         <Select
                           value={category}
                           onChange={(e) => setCategory(e.target.value)}
-                          label="Category / Service Area"
+                          label={t('categoryServiceArea')}
                         >
-                          {CATEGORIES.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+                          {CATEGORIES.map(c => <MenuItem key={c} value={c}>{tCategory(c)}</MenuItem>)}
                         </Select>
                       </FormControl>
                     </Grid>
 
                     <Grid item xs={12} sm={6}>
                       <FormControl fullWidth required>
-                        <InputLabel>Delhi District Location</InputLabel>
+                        <InputLabel>{t('delhiDistrictLocation')}</InputLabel>
                         <Select
                           value={district}
                           onChange={(e) => setDistrict(e.target.value)}
-                          label="Delhi District Location"
+                          label={t('delhiDistrictLocation')}
                         >
-                          {DISTRICTS.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}
+                          {DISTRICTS.map(d => <MenuItem key={d} value={d}>{tDistrict(d)}</MenuItem>)}
                         </Select>
                       </FormControl>
                     </Grid>
 
                     <Grid item xs={12} sm={6}>
                       <TextField
-                        label="GPS Latitude"
+                        label={t('gpsLatitude')}
                         fullWidth
                         value={lat}
                         onChange={(e) => setLat(e.target.value)}
@@ -263,7 +265,7 @@ export default function TrackComplaint() {
 
                     <Grid item xs={12} sm={6}>
                       <TextField
-                        label="GPS Longitude"
+                        label={t('gpsLongitude')}
                         fullWidth
                         value={lng}
                         onChange={(e) => setLng(e.target.value)}
@@ -272,11 +274,11 @@ export default function TrackComplaint() {
 
                     <Grid item xs={12}>
                       <TextField
-                        label="Upload Photo URL (Proof of Issue)"
+                        label={t('uploadPhotoUrl')}
                         fullWidth
                         value={photoBefore}
                         onChange={(e) => setPhotoBefore(e.target.value)}
-                        placeholder="Enter image URL showing the damaged pothole/leak..."
+                        placeholder={t('photoPlaceholder')}
                       />
                     </Grid>
 
@@ -291,13 +293,13 @@ export default function TrackComplaint() {
                         }
                         label={
                           <Typography variant="body2" sx={{ fontWeight: 700, color: '#B91C1C' }}>
-                            Is this life-threatening / critical? (Immediate CM Office Dispatch)
+                            {t('isLifeThreatening')}
                           </Typography>
                         }
                       />
                       {isCritical && (
                         <Alert severity="error" sx={{ mt: 1, fontWeight: 600 }}>
-                          WARNING: Declaring a false life-threatening alert is a punishable offense under the Delhi Civic-Tech Grievance Redressal Act.
+                          {t('warningFalseAlert')}
                         </Alert>
                       )}
                     </Grid>
@@ -318,7 +320,7 @@ export default function TrackComplaint() {
                           '&:hover': { backgroundColor: '#1E40AF' }
                         }}
                       >
-                        Submit Grievance
+                        {t('submitGrievance')}
                       </Button>
                     </Grid>
                   </Grid>
@@ -332,7 +334,7 @@ export default function TrackComplaint() {
             <Box>
               <Box component="form" onSubmit={handleTrack} sx={{ display: 'flex', gap: 2, mb: 4 }}>
                 <TextField
-                  label="Enter Tracking Reference (e.g. DL-2026-8921)"
+                  label={t('enterTrackingRef')}
                   variant="outlined"
                   fullWidth
                   required
@@ -345,12 +347,12 @@ export default function TrackComplaint() {
                   startIcon={<SearchIcon />}
                   sx={{ backgroundColor: '#0A2540', textTransform: 'none', px: 4 }}
                 >
-                  Search
+                  {t('search')}
                 </Button>
               </Box>
 
               {hasSearched && !trackedComp && (
-                <Alert severity="error">No record found matching the reference number provided.</Alert>
+                <Alert severity="error">{t('noRecordFound')}</Alert>
               )}
 
               {trackedComp && (
@@ -361,7 +363,7 @@ export default function TrackComplaint() {
                       <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={2} sx={{ mb: 2 }}>
                         <Box>
                           <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 700 }}>
-                            GRIEVANCE ID: {trackedComp.tracking_no}
+                            {t('grievanceId')} {trackedComp.tracking_no}
                           </Typography>
                           <Typography variant="h5" sx={{ fontWeight: 800, color: '#0A2540' }}>
                             {trackedComp.title}
@@ -376,21 +378,21 @@ export default function TrackComplaint() {
 
                       <Grid container spacing={2}>
                         <Grid item xs={6} md={3}>
-                          <Typography variant="caption" sx={{ color: '#94A3B8' }}>DEPARTMENT</Typography>
+                          <Typography variant="caption" sx={{ color: '#94A3B8' }}>{t('departmentLabel')}</Typography>
                           <Typography variant="body2" sx={{ fontWeight: 700 }}>{trackedComp.department_name}</Typography>
                         </Grid>
                         <Grid item xs={6} md={3}>
-                          <Typography variant="caption" sx={{ color: '#94A3B8' }}>DISTRICT</Typography>
-                          <Typography variant="body2" sx={{ fontWeight: 700 }}>{trackedComp.district}</Typography>
+                          <Typography variant="caption" sx={{ color: '#94A3B8' }}>{t('districtLabel')}</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>{tDistrict(trackedComp.district)}</Typography>
                         </Grid>
                         <Grid item xs={6} md={3}>
-                          <Typography variant="caption" sx={{ color: '#94A3B8' }}>REPORTED DATE</Typography>
+                          <Typography variant="caption" sx={{ color: '#94A3B8' }}>{t('reportedDateLabel')}</Typography>
                           <Typography variant="body2" sx={{ fontWeight: 700 }}>
                             {new Date(trackedComp.created_at).toLocaleDateString('en-IN')}
                           </Typography>
                         </Grid>
                         <Grid item xs={6} md={3}>
-                          <Typography variant="caption" sx={{ color: '#94A3B8' }}>SEVERITY</Typography>
+                          <Typography variant="caption" sx={{ color: '#94A3B8' }}>{t('severityLabel')}</Typography>
                           <Typography variant="body2" sx={{ fontWeight: 700, color: '#B91C1C' }}>
                             {trackedComp.severity.toUpperCase()}
                           </Typography>
@@ -401,7 +403,7 @@ export default function TrackComplaint() {
                       
                       {/* Social sharing links */}
                       <Stack direction="row" alignItems="center" spacing={2}>
-                        <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>SHARE PUBLIC LINK:</Typography>
+                        <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>{t('sharePublicLink')}</Typography>
                         <SocialShare trackingNo={trackedComp.tracking_no} title={trackedComp.title} status={trackedComp.status} />
                       </Stack>
                     </CardContent>
@@ -409,7 +411,7 @@ export default function TrackComplaint() {
 
                   {/* Audit Logs / Timeline */}
                   <Typography variant="h6" sx={{ fontFamily: '"Outfit", sans-serif', fontWeight: 700, color: '#0A2540', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <TimelineIcon /> Progress Logs
+                    <TimelineIcon /> {t('progressLogs')}
                   </Typography>
 
                   <Paper variant="outlined" sx={{ p: 3, mb: 4, borderRadius: '10px' }}>
@@ -433,15 +435,15 @@ export default function TrackComplaint() {
                   {trackedComp.status === 'resolved' && !feedbackSubmitted && (
                     <Paper elevation={3} sx={{ p: 4, borderRadius: '12px', border: '1px solid #A7F3D0', backgroundColor: '#F0FDF4' }}>
                       <Typography variant="h6" sx={{ fontWeight: 700, color: '#065F46', mb: 1 }}>
-                        Rate Your Grievance Resolution
+                        {t('rateResolution')}
                       </Typography>
                       <Typography variant="body2" sx={{ color: '#047857', mb: 3 }}>
-                        Please evaluate the engineer\'s performance. Ratings under 3 stars auto-reopen this grievance.
+                        {t('rateSubtitle')}
                       </Typography>
 
                       <Box component="form" onSubmit={handleFeedback}>
                         <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <Typography variant="subtitle2" sx={{ color: '#065F46' }}>Rating:</Typography>
+                          <Typography variant="subtitle2" sx={{ color: '#065F46' }}>{t('ratingLabel')}</Typography>
                           <Rating 
                             name="resolution-rating" 
                             value={rating} 
@@ -449,14 +451,14 @@ export default function TrackComplaint() {
                           />
                         </Box>
                         <TextField
-                          label="Your Comments / Issues"
+                          label={t('commentsIssues')}
                           multiline
                           rows={2}
                           fullWidth
                           required={rating < 3}
                           value={comments}
                           onChange={(e) => setComments(e.target.value)}
-                          placeholder="Provide details about why this was not fixed fully (required for ratings < 3)..."
+                          placeholder={t('commentsPlaceholder')}
                           sx={{ mb: 2, backgroundColor: '#fff' }}
                         />
                         <Button 
@@ -465,7 +467,7 @@ export default function TrackComplaint() {
                           color="success"
                           sx={{ textTransform: 'none', fontWeight: 600 }}
                         >
-                          Submit Review
+                          {t('submitReview')}
                         </Button>
                       </Box>
                     </Paper>
@@ -473,7 +475,7 @@ export default function TrackComplaint() {
 
                   {feedbackSubmitted && (
                     <Alert severity="success" sx={{ mb: 2 }}>
-                      Feedback logged. Thank you for verifying resolution standards in the state.
+                      {t('feedbackSuccess')}
                     </Alert>
                   )}
                 </Box>
@@ -485,10 +487,10 @@ export default function TrackComplaint() {
           {tabValue === 2 && user && user.role === 'citizen' && (
             <Box>
               <Typography variant="h6" sx={{ fontFamily: '"Outfit", sans-serif', fontWeight: 700, color: '#0A2540', mb: 2 }}>
-                My Registered Grievance History
+                {t('myHistoryTitle')}
               </Typography>
               {myComplaints.length === 0 ? (
-                <Alert severity="info">You have not submitted any grievances yet.</Alert>
+                <Alert severity="info">{t('noGrievances')}</Alert>
               ) : (
                 <Grid container spacing={2}>
                   {myComplaints.map((c) => (
@@ -506,7 +508,7 @@ export default function TrackComplaint() {
                           </Typography>
                           <Stack direction="row" justifyContent="space-between" alignItems="center">
                             <Typography variant="caption" sx={{ color: '#94A3B8' }}>
-                              District: <b>{c.district}</b> | Category: <b>{c.category}</b>
+                              {t('districtLabel')}: <b>{tDistrict(c.district)}</b> | {t('categoryServiceArea')}: <b>{tCategory(c.category)}</b>
                             </Typography>
                             <Button 
                               size="small" 
@@ -521,7 +523,7 @@ export default function TrackComplaint() {
                               }}
                               sx={{ textTransform: 'none', py: 0.2, fontSize: 11 }}
                             >
-                              Track & Review
+                              {t('trackReviewBtn')}
                             </Button>
                           </Stack>
                         </CardContent>

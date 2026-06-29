@@ -13,6 +13,7 @@ import { departmentService } from '../services/departmentService';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import StatusBadge from '../components/common/StatusBadge';
+import { useLanguage } from '../context/LanguageContext';
 
 const DISTRICTS = [
   'All', 'New Delhi', 'North Delhi', 'South Delhi', 'East Delhi', 'West Delhi', 
@@ -23,6 +24,7 @@ const DISTRICTS = [
 export default function Complaints() {
   const { user } = useAuth();
   const { showNotification } = useNotification();
+  const { t, tDistrict } = useLanguage();
   const [complaints, setComplaints] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [officers, setOfficers] = useState([]);
@@ -251,46 +253,46 @@ export default function Complaints() {
 
           <Grid item xs={6} sm={2} md={2.2}>
             <FormControl variant="outlined" size="small" fullWidth>
-              <InputLabel>Status</InputLabel>
-              <Select value={status} onChange={(e) => setStatus(e.target.value)} label="Status">
-                <MenuItem value="All">All Statuses</MenuItem>
-                <MenuItem value="pending">Pending</MenuItem>
-                <MenuItem value="assigned">Assigned</MenuItem>
-                <MenuItem value="in_progress">In Progress</MenuItem>
-                <MenuItem value="resolved">Resolved</MenuItem>
-                <MenuItem value="reopened">Reopened</MenuItem>
-                <MenuItem value="escalated">Escalated</MenuItem>
+              <InputLabel>{t('status', 'Status')}</InputLabel>
+              <Select value={status} onChange={(e) => setStatus(e.target.value)} label={t('status', 'Status')}>
+                <MenuItem value="All">{t('allStatuses', 'All Statuses')}</MenuItem>
+                <MenuItem value="pending">{t('pending', 'Pending Routing')}</MenuItem>
+                <MenuItem value="assigned">{t('assigned', 'Assigned')}</MenuItem>
+                <MenuItem value="in_progress">{t('in_progress', 'In Progress')}</MenuItem>
+                <MenuItem value="resolved">{t('resolved', 'Resolved')}</MenuItem>
+                <MenuItem value="reopened">{t('reopened', 'Reopened')}</MenuItem>
+                <MenuItem value="escalated">{t('escalated', 'Escalated to CM')}</MenuItem>
               </Select>
             </FormControl>
           </Grid>
 
           <Grid item xs={6} sm={2} md={2.2}>
             <FormControl variant="outlined" size="small" fullWidth>
-              <InputLabel>Severity</InputLabel>
-              <Select value={severity} onChange={(e) => setSeverity(e.target.value)} label="Severity">
-                <MenuItem value="All">All Severities</MenuItem>
-                <MenuItem value="low">Low</MenuItem>
-                <MenuItem value="medium">Medium</MenuItem>
-                <MenuItem value="high">High</MenuItem>
-                <MenuItem value="critical">Critical</MenuItem>
+              <InputLabel>{t('severityLabel', 'Severity')}</InputLabel>
+              <Select value={severity} onChange={(e) => setSeverity(e.target.value)} label={t('severityLabel', 'Severity')}>
+                <MenuItem value="All">{t('allSeverities', 'All Severities')}</MenuItem>
+                <MenuItem value="low">{t('low', 'Low')}</MenuItem>
+                <MenuItem value="medium">{t('medium', 'Medium')}</MenuItem>
+                <MenuItem value="high">{t('high', 'High')}</MenuItem>
+                <MenuItem value="critical">{t('critical', 'Critical')}</MenuItem>
               </Select>
             </FormControl>
           </Grid>
 
           <Grid item xs={6} sm={2} md={2.2}>
             <FormControl variant="outlined" size="small" fullWidth disabled={user?.role === 'admin'}>
-              <InputLabel>District</InputLabel>
-              <Select value={district} onChange={(e) => setDistrict(e.target.value)} label="District">
-                {DISTRICTS.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}
+              <InputLabel>{t('districtLabel', 'District')}</InputLabel>
+              <Select value={district} onChange={(e) => setDistrict(e.target.value)} label={t('districtLabel', 'District')}>
+                {DISTRICTS.map(d => <MenuItem key={d} value={d}>{tDistrict(d)}</MenuItem>)}
               </Select>
             </FormControl>
           </Grid>
 
           <Grid item xs={6} sm={2} md={2.4}>
             <FormControl variant="outlined" size="small" fullWidth>
-              <InputLabel>Department</InputLabel>
-              <Select value={department} onChange={(e) => setDepartment(e.target.value)} label="Department">
-                <MenuItem value="All">All Departments</MenuItem>
+              <InputLabel>{t('departmentLabel', 'Department')}</InputLabel>
+              <Select value={department} onChange={(e) => setDepartment(e.target.value)} label={t('departmentLabel', 'Department')}>
+                <MenuItem value="All">{t('allDepartments', 'All Departments')}</MenuItem>
                 {departments.map(dept => (
                   <MenuItem key={dept.code} value={dept.code}>{dept.code}</MenuItem>
                 ))}

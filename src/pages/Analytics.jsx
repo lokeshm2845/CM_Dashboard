@@ -9,6 +9,7 @@ import { complaintService } from '../services/complaintService';
 import { analyticsService } from '../services/analyticsService';
 import { useNotification } from '../context/NotificationContext';
 import StatusBadge from '../components/common/StatusBadge';
+import { useLanguage } from '../context/LanguageContext';
 
 const DISTRICTS = [
   'All', 'New Delhi', 'North Delhi', 'South Delhi', 'East Delhi', 'West Delhi', 
@@ -39,6 +40,7 @@ const getMarkerIcon = (status) => {
 
 export default function Analytics() {
   const { showNotification } = useNotification();
+  const { t, tDistrict } = useLanguage();
   const [district, setDistrict] = useState('All');
   const [complaints, setComplaints] = useState([]);
   const [districtScores, setDistrictScores] = useState([]);
@@ -100,18 +102,18 @@ export default function Analytics() {
       {/* Filter and District Selector */}
       <Paper elevation={1} sx={{ p: 2, mb: 3, borderRadius: '12px', display: 'flex', alignItems: 'center', gap: 2 }}>
         <FormControl variant="outlined" size="small" sx={{ minWidth: 200 }}>
-          <InputLabel id="map-district-label">Select District</InputLabel>
+          <InputLabel id="map-district-label">{t('filterDistrict')}</InputLabel>
           <Select
             labelId="map-district-label"
             value={district}
             onChange={(e) => setDistrict(e.target.value)}
-            label="Select District"
+            label={t('filterDistrict')}
           >
-            {DISTRICTS.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}
+            {DISTRICTS.map(d => <MenuItem key={d} value={d}>{tDistrict(d)}</MenuItem>)}
           </Select>
         </FormControl>
         <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
-          Mapping {complaints.length} active complaints in {district === 'All' ? 'NCT of Delhi' : district}
+          {t('mappingComplaints', 'Mapping')} {complaints.length} {t('activeComplaintsIn', 'active complaints in')} {district === 'All' ? t('nctDelhi', 'NCT of Delhi') : tDistrict(district)}
         </Typography>
       </Paper>
 

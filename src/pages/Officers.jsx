@@ -15,10 +15,12 @@ import { departmentService } from '../services/departmentService';
 import { officerService } from '../services/officerService';
 import { useAuth } from '../context/AuthContext';
 import { DISTRICTS } from '../utils/constants';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function Officers() {
   const { user } = useAuth();
   const { showNotification } = useNotification();
+  const { t, tDistrict } = useLanguage();
   const [officers, setOfficers] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -284,13 +286,13 @@ export default function Officers() {
                 placeholder="e.g. 9876543203"
               />
               <FormControl fullWidth required>
-                <InputLabel>Delhi District Jurisdiction</InputLabel>
+                <InputLabel>{t('delhiDistrictLocation')}</InputLabel>
                 <Select
                   value={district}
                   onChange={(e) => setDistrict(e.target.value)}
-                  label="Delhi District Jurisdiction"
+                  label={t('delhiDistrictLocation')}
                 >
-                  {DISTRICTS.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}
+                  {DISTRICTS.map(d => <MenuItem key={d} value={d}>{tDistrict(d)}</MenuItem>)}
                 </Select>
               </FormControl>
               <FormControl fullWidth required>

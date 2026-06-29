@@ -20,6 +20,7 @@ import { useNotification } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
 import StatusBadge from '../components/common/StatusBadge';
 import { isMock, supabase } from '../services/supabaseClient';
+import { useLanguage } from '../context/LanguageContext';
 
 const DISTRICTS = [
   'All', 'New Delhi', 'North Delhi', 'South Delhi', 'East Delhi', 'West Delhi', 
@@ -30,6 +31,7 @@ const DISTRICTS = [
 export default function CMDashboard() {
   const { showNotification } = useNotification();
   const { user } = useAuth();
+  const { t, tDistrict } = useLanguage();
   const navigate = useNavigate();
   const [district, setDistrict] = useState(user?.role === 'admin' ? user.district || 'Central Delhi' : 'All');
   const [kpis, setKpis] = useState({
@@ -198,20 +200,20 @@ export default function CMDashboard() {
       {/* District Filter Selector */}
       <Paper elevation={1} sx={{ p: 2, mb: 3, borderRadius: '12px', display: 'flex', alignItems: 'center', gap: 2, borderLeft: user?.role === 'admin' ? '5px solid #FF9933' : 'none' }}>
         <FormControl variant="outlined" size="small" sx={{ minWidth: 200 }} disabled={user?.role === 'admin'}>
-          <InputLabel id="district-filter-label">Filter District</InputLabel>
+          <InputLabel id="district-filter-label">{t('filterDistrict')}</InputLabel>
           <Select
             labelId="district-filter-label"
             value={district}
             onChange={(e) => setDistrict(e.target.value)}
-            label="Filter District"
+            label={t('filterDistrict')}
           >
-            {DISTRICTS.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}
+            {DISTRICTS.map(d => <MenuItem key={d} value={d}>{tDistrict(d)}</MenuItem>)}
           </Select>
         </FormControl>
         <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
           {user?.role === 'admin' 
-            ? `Locked to your assigned district: ${district}` 
-            : `Showing stats for ${district === 'All' ? 'all 11 Delhi Districts' : `${district} District`}`}
+            ? `${t('lockedDistrict', 'Locked to your assigned district')}: ${tDistrict(district)}` 
+            : `${t('showingStatsFor', 'Showing stats for')} ${district === 'All' ? t('all11Districts', 'all 11 Delhi Districts') : `${tDistrict(district)}`}`}
         </Typography>
       </Paper>
 

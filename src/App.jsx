@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavig
 import { Box, CssBaseline, Toolbar, AppBar, Button, Typography, Container } from '@mui/material';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { LanguageProvider, useLanguage } from './context/LanguageContext';
+import LanguageSelector from './components/common/LanguageSelector';
 
 // Import Pages
 import Login from './pages/Login';
@@ -42,6 +44,7 @@ const RouteGuard = ({ children, allowedRoles }) => {
 // Main Layout Wrapper
 function AppLayout() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -72,13 +75,31 @@ function AppLayout() {
         <CssBaseline />
         {/* Simple Guest Navbar */}
         <AppBar position="static" sx={{ backgroundColor: '#0A2540', boxShadow: 1 }}>
-          <Toolbar>
-            <Typography variant="h6" sx={{ fontFamily: '"Outfit", sans-serif', fontWeight: 700, flexGrow: 1 }}>
-              DELHI CM GRIEVANCES
-            </Typography>
-            <Button color="inherit" onClick={() => navigate('/login')} sx={{ textTransform: 'none', fontWeight: 600 }}>
-              Official Login
-            </Button>
+          <Toolbar sx={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{ 
+                width: 30, 
+                height: 30, 
+                borderRadius: '50%', 
+                background: 'linear-gradient(135deg, #FF9933 30%, #FFFFFF 50%, #138808 70%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 0 4px rgba(255,255,255,0.8)',
+                border: '2px solid #0A2540'
+              }}>
+                <Typography variant="caption" sx={{ fontWeight: 800, color: '#0A2540', fontSize: 9 }}>DL</Typography>
+              </Box>
+              <Typography variant="h6" sx={{ fontFamily: '"Outfit", sans-serif', fontWeight: 700 }}>
+                {t('delhiGovernment')}
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <LanguageSelector />
+              <Button color="inherit" onClick={() => navigate('/login')} sx={{ textTransform: 'none', fontWeight: 600 }}>
+                {t('officialLogin')}
+              </Button>
+            </Box>
           </Toolbar>
         </AppBar>
         <Container maxWidth="md" sx={{ mt: 2 }}>
@@ -198,11 +219,13 @@ function AppLayout() {
 export default function App() {
   return (
     <Router>
-      <NotificationProvider>
-        <AuthProvider>
-          <AppLayout />
-        </AuthProvider>
-      </NotificationProvider>
+      <LanguageProvider>
+        <NotificationProvider>
+          <AuthProvider>
+            <AppLayout />
+          </AuthProvider>
+        </NotificationProvider>
+      </LanguageProvider>
     </Router>
   );
 }

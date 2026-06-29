@@ -7,6 +7,7 @@ import { complaintService } from '../services/complaintService';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { calculateDistance } from '../utils/helpers';
+import { useLanguage } from '../context/LanguageContext';
 
 const DISTRICTS = [
   'New Delhi', 'North Delhi', 'South Delhi', 'East Delhi', 'West Delhi', 
@@ -38,6 +39,7 @@ const MOCK_VISITS_KEY = 'delhi_cm_visits';
 export default function VisitLogs() {
   const { user } = useAuth();
   const { showNotification } = useNotification();
+  const { t, tDistrict } = useLanguage();
   const [visits, setVisits] = useState([]);
   const [complaints, setComplaints] = useState([]);
   const [selectedVisit, setSelectedVisit] = useState(null);
@@ -178,13 +180,13 @@ export default function VisitLogs() {
               </Typography>
               <Box component="form" onSubmit={handleAddVisit}>
                 <FormControl fullWidth required sx={{ mb: 2 }}>
-                  <InputLabel>Delhi District</InputLabel>
+                  <InputLabel>{t('delhiDistrictLocation')}</InputLabel>
                   <Select
                     value={district}
                     onChange={handleDistrictSelect}
-                    label="Delhi District"
+                    label={t('delhiDistrictLocation')}
                   >
-                    {DISTRICTS.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}
+                    {DISTRICTS.map(d => <MenuItem key={d} value={d}>{tDistrict(d)}</MenuItem>)}
                   </Select>
                 </FormControl>
                 

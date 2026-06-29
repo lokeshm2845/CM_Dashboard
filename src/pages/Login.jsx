@@ -13,6 +13,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useNotification } from '../context/NotificationContext';
+import { useLanguage } from '../context/LanguageContext';
 
 const DISTRICTS = [
   'New Delhi', 'North Delhi', 'South Delhi', 'East Delhi', 'West Delhi', 
@@ -32,6 +33,7 @@ export default function Login() {
   const { login, register, isMock } = useAuth();
   const navigate = useNavigate();
   const { showNotification } = useNotification();
+  const { t, tDistrict } = useLanguage();
 
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -109,10 +111,10 @@ export default function Login() {
   };
 
   const quickProfiles = [
-    { name: 'Chief Minister', role: 'cm', email: 'cm@delhi.gov.in', icon: <DashboardIcon sx={{ color: '#FF9933' }} />, desc: 'CM cell oversight view' },
-    { name: 'State Administrator', role: 'admin', email: 'admin@delhi.gov.in', icon: <SecurityIcon sx={{ color: '#138808' }} />, desc: 'System control & reassignments' },
-    { name: 'PWD Executive Officer', role: 'officer', email: 'pwd.officer@delhi.gov.in', icon: <AssignmentIndIcon sx={{ color: '#007FFF' }} />, desc: 'Resolve potholes, before/after check' },
-    { name: 'Citizen Portal', role: 'citizen', email: 'priya@gmail.com', icon: <PersonIcon sx={{ color: '#64748B' }} />, desc: 'Register grievances & submit ratings' }
+    { name: t('roleCm'), role: 'cm', email: 'cm@delhi.gov.in', icon: <DashboardIcon sx={{ color: '#FF9933' }} />, desc: 'CM cell oversight view' },
+    { name: t('roleAdmin'), role: 'admin', email: 'admin@delhi.gov.in', icon: <SecurityIcon sx={{ color: '#138808' }} />, desc: 'System control & reassignments' },
+    { name: t('roleOfficer'), role: 'officer', email: 'pwd.officer@delhi.gov.in', icon: <AssignmentIndIcon sx={{ color: '#007FFF' }} />, desc: 'Resolve potholes, before/after check' },
+    { name: t('roleCitizen'), role: 'citizen', email: 'priya@gmail.com', icon: <PersonIcon sx={{ color: '#64748B' }} />, desc: 'Register grievances & submit ratings' }
   ];
 
   return (
@@ -146,25 +148,25 @@ export default function Login() {
                 </Box>
                 <Box>
                   <Typography variant="h5" sx={{ fontFamily: '"Outfit", sans-serif', fontWeight: 800, letterSpacing: 0.5 }}>
-                    DELHI GOVERNMENT
+                    {t('delhiGovernment')}
                   </Typography>
                   <Typography variant="caption" sx={{ color: '#FF9933', fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', fontSize: 10 }}>
-                    CM Grievance Redressal Desk
+                    {t('citizenRedressalDesk')}
                   </Typography>
                 </Box>
               </Box>
 
               <Typography variant="h3" sx={{ fontFamily: '"Outfit", sans-serif', fontWeight: 800, mb: 2, fontSize: { xs: '2rem', md: '2.5rem' }, lineHeight: 1.2 }}>
-                Public Grievance Resolution Portal
+                {t('publicGrievancePortal')}
               </Typography>
               <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.7)', mb: 4, lineHeight: 1.6, fontSize: '0.95rem' }}>
-                A unified grievance reporting and status tracking channel for the citizens of Delhi. Connects issues directly to responsible agency engineers.
+                {t('brandingSubtitle')}
               </Typography>
 
               <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap sx={{ gap: 1 }}>
-                <Chip label="Auto Routing" sx={{ color: '#fff', border: '1px solid rgba(255,255,255,0.2)', fontWeight: 600 }} />
-                <Chip label="Audit Timelines" sx={{ color: '#fff', border: '1px solid rgba(255,255,255,0.2)', fontWeight: 600 }} />
-                <Chip label="10% Random Audits" sx={{ color: '#fff', border: '1px solid rgba(255,255,255,0.2)', fontWeight: 600 }} />
+                <Chip label={t('autoRouting')} sx={{ color: '#fff', border: '1px solid rgba(255,255,255,0.2)', fontWeight: 600 }} />
+                <Chip label={t('auditTimelines')} sx={{ color: '#fff', border: '1px solid rgba(255,255,255,0.2)', fontWeight: 600 }} />
+                <Chip label={t('randomAudits')} sx={{ color: '#fff', border: '1px solid rgba(255,255,255,0.2)', fontWeight: 600 }} />
               </Stack>
             </Box>
           </Grid>
@@ -179,10 +181,10 @@ export default function Login() {
               border: '1px solid rgba(255, 255, 255, 0.3)'
             }}>
               <Typography variant="h5" sx={{ fontFamily: '"Outfit", sans-serif', fontWeight: 800, color: '#0A2540', mb: 0.5 }}>
-                {isRegisterMode ? 'Create State Account' : 'Welcome Back'}
+                {isRegisterMode ? t('createStateAccount') : t('welcomeBack')}
               </Typography>
               <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mb: 3 }}>
-                {isMock ? 'Demo Sandbox Mode Active. Credentials saved locally.' : 'Live Supabase DB connection active.'}
+                {isMock ? t('demoSandboxMode') : t('liveSupabaseDb')}
               </Typography>
 
               <Box component="form" onSubmit={handleAuthAction}>
@@ -192,7 +194,7 @@ export default function Login() {
                     <>
                       <Grid item xs={12} sm={6}>
                         <TextField
-                          label="Full Name"
+                          label={t('fullName')}
                           variant="outlined"
                           size="small"
                           fullWidth
@@ -203,7 +205,7 @@ export default function Login() {
                       </Grid>
                       <Grid item xs={12} sm={6}>
                         <TextField
-                          label="Phone Number"
+                          label={t('phoneNumber')}
                           variant="outlined"
                           size="small"
                           fullWidth
@@ -217,7 +219,7 @@ export default function Login() {
 
                   <Grid item xs={12} sm={isRegisterMode ? 6 : 12}>
                     <TextField
-                      label="Email Address"
+                      label={t('emailAddress')}
                       type="email"
                       variant="outlined"
                       size="small"
@@ -231,7 +233,7 @@ export default function Login() {
 
                   <Grid item xs={12} sm={isRegisterMode ? 6 : 12}>
                     <TextField
-                      label="Password"
+                      label={t('passwordLabel')}
                       type="password"
                       variant="outlined"
                       size="small"
@@ -247,32 +249,32 @@ export default function Login() {
                     <>
                       <Grid item xs={12} sm={6}>
                         <FormControl variant="outlined" size="small" fullWidth required>
-                          <InputLabel>Account Role</InputLabel>
+                          <InputLabel>{t('selectRole')}</InputLabel>
                           <Select
                             value={role}
                             onChange={(e) => {
                               setRole(e.target.value);
                               if (e.target.value !== 'officer') setDepartmentCode('');
                             }}
-                            label="Account Role"
+                            label={t('selectRole')}
                           >
-                            <MenuItem value="citizen">Citizen User</MenuItem>
-                            <MenuItem value="officer">Department Officer</MenuItem>
-                            <MenuItem value="admin">State Admin</MenuItem>
-                            <MenuItem value="cm">Chief Minister Cell</MenuItem>
+                            <MenuItem value="citizen">{t('roleCitizen')}</MenuItem>
+                            <MenuItem value="officer">{t('roleOfficer')}</MenuItem>
+                            <MenuItem value="admin">{t('roleAdmin')}</MenuItem>
+                            <MenuItem value="cm">{t('roleCm')}</MenuItem>
                           </Select>
                         </FormControl>
                       </Grid>
 
                       <Grid item xs={12} sm={6}>
                         <FormControl variant="outlined" size="small" fullWidth required>
-                          <InputLabel>District Location</InputLabel>
+                          <InputLabel>{t('delhiDistrictLocation')}</InputLabel>
                           <Select
                             value={district}
                             onChange={(e) => setDistrict(e.target.value)}
-                            label="District Location"
+                            label={t('delhiDistrictLocation')}
                           >
-                            {DISTRICTS.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}
+                            {DISTRICTS.map(d => <MenuItem key={d} value={d}>{tDistrict(d)}</MenuItem>)}
                           </Select>
                         </FormControl>
                       </Grid>
@@ -280,11 +282,11 @@ export default function Login() {
                       {role === 'officer' && (
                         <Grid item xs={12}>
                           <FormControl variant="outlined" size="small" fullWidth required>
-                            <InputLabel>Department Organization</InputLabel>
+                            <InputLabel>{t('selectDepartment')}</InputLabel>
                             <Select
                               value={departmentCode}
                               onChange={(e) => setDepartmentCode(e.target.value)}
-                              label="Department Organization"
+                              label={t('selectDepartment')}
                             >
                               {DEPARTMENTS.map(dept => (
                                 <MenuItem key={dept.code} value={dept.code}>{dept.name}</MenuItem>
@@ -316,7 +318,7 @@ export default function Login() {
                     '&:hover': { backgroundColor: '#1E40AF' }
                   }}
                 >
-                  {loading ? 'Authenticating...' : isRegisterMode ? 'Create Account' : 'Sign In'}
+                  {loading ? '...' : (isRegisterMode ? t('signupBtn') : t('signinBtn'))}
                 </Button>
               </Box>
 
@@ -327,14 +329,14 @@ export default function Login() {
                   onClick={() => setIsRegisterMode(!isRegisterMode)}
                   sx={{ textTransform: 'none', fontWeight: 600, color: '#FF9933' }}
                 >
-                  {isRegisterMode ? 'Already have an account? Sign In' : "Don't have an account? Register"}
+                  {isRegisterMode ? t('alreadyHaveAccount') : t('dontHaveAccount')}
                 </Button>
               </Box>
 
               {!isRegisterMode && (
                 <>
                   <Divider sx={{ my: 2 }}>
-                    <Chip label="QUICK DEMO LOGINS" sx={{ fontSize: 9, fontWeight: 700, color: '#94A3B8' }} />
+                    <Chip label={t('quickLoginHeader')} sx={{ fontSize: 9, fontWeight: 700, color: '#94A3B8' }} />
                   </Divider>
 
                   <Grid container spacing={1.5}>

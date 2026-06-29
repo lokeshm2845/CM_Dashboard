@@ -12,11 +12,13 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 const drawerWidth = 240;
 
 export default function Sidebar({ open, onClose }) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -40,6 +42,16 @@ export default function Sidebar({ open, onClose }) {
       <List sx={{ px: 1 }}>
         {filteredItems.map((item) => {
           const isSelected = location.pathname === item.path;
+          const keyMap = {
+            'CM Summary': 'cmSummary',
+            'Analytics & Maps': 'analyticsMaps',
+            'Active Grievances': 'activeGrievances',
+            'Departments': 'departments',
+            'Officer Directory': 'officerDirectory',
+            'CM District Visits': 'cmDistrictVisits',
+            'Submit / Track': 'submitTrack'
+          };
+          const translatedText = t(keyMap[item.text] || item.text, item.text);
           return (
             <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
               <ListItemButton
@@ -61,7 +73,7 @@ export default function Sidebar({ open, onClose }) {
                   {item.icon}
                 </ListItemIcon>
                 <ListItemText 
-                  primary={item.text} 
+                  primary={translatedText} 
                   primaryTypographyProps={{
                     fontSize: 14,
                     fontWeight: isSelected ? 700 : 500,
@@ -77,7 +89,7 @@ export default function Sidebar({ open, onClose }) {
       <Divider sx={{ my: 2, mx: 2 }} />
       <Box sx={{ px: 3, py: 1, textAlign: 'center' }}>
         <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block', fontSize: 10, letterSpacing: 1 }}>
-          NCT DELHI PORTAL v1.0
+          {t('portalVersion')}
         </Typography>
       </Box>
     </Box>
