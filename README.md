@@ -378,7 +378,7 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 Project Maintainer: **Lokesh Magare**
 
-- **Email**: Lokeshmagare28@gmail.com
+- **Email**: lokeshmagare866@gmail.com
 - **GitHub**: [lokeshm2845](https://github.com/lokeshm2845)
 - **Live Demo**: [https://cm-dashboard-lovat.vercel.app](https://cm-dashboard-lovat.vercel.app)
 
